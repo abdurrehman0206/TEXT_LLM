@@ -1,0 +1,51 @@
+# Dockerfile that INCLUDES the model file in the image
+# Use this for Coolify deployment where you want everything self-contained
+# WARNING: This will create a very large image (~8GB+)
+
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies for llama-cpp-python
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY main.py .
+COPY paraphrase_service.py .
+
+# Create models directory
+RUN mkdir -p /app/models
+
+# Copy the model file into the image
+# NOTE: This makes the image very large (~8GB)
+# Make sure the model file exists in the build context
+COPY llama-2-13b.Q4_K_M.gguf /app/models/llama-2-13b.Q4_K_M.gguf
+
+# Expose port
+EXPOSE 8000
+
+# Set environment variables
+ENV MODEL_PATH=/app/models/llama-2-13b.Q4_K_M.gguf
+ENV N_CTX=4096
+ENV N_THREADS=0
+ENV N_BATCH=512
+ENV PORT=8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+
+# Run the application
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+

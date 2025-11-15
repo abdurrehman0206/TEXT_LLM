@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  paraphrase-api:
+    build: .
+    container_name: paraphrase-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=/app/models/llama-2-13b.Q4_K_M.gguf
+      - N_CTX=4096
+      - N_THREADS=0
+      - N_BATCH=512
+      - PORT=8000
+    volumes:
+      # Mount your model file here (for local testing)
+      # For Coolify: Either include model in image OR mount as volume in Coolify settings
+      - ./llama-2-13b.Q4_K_M.gguf:/app/models/llama-2-13b.Q4_K_M.gguf:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
